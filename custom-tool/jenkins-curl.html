@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>Jenkins URL Builder</title>
+  <style>
+/* 基本重置 */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+               Roboto, "Noto Sans TC", Arial, sans-serif;
+  background: #f5f7fa;
+  color: #222;
+  padding: 24px;
+}
+
+/* 標題 */
+h2 {
+  margin-bottom: 20px;
+}
+
+/* 整體左右版面 */
+.layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+/* 左右面板 */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panel-left {
+  flex: 0 0 360px;
+}
+
+.panel-right {
+  flex: 1;
+}
+
+/* 卡片樣式 */
+.card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+/* 卡片標題 */
+.card h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+/* 表單 */
+label {
+  display: block;
+  font-size: 13px;
+  margin: 10px 0 4px;
+  color: #555;
+}
+
+select {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+
+/* checkbox 區 */
+.options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.options label {
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* pre 輸出 */
+pre {
+  background: #0f172a;
+  color: #e5e7eb;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* 按鈕 */
+button {
+  margin: 8px 0;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #1e40af;
+}
+
+/* 多選結果區 */
+.result pre {
+  margin-top: 10px;
+  max-height: 360px;
+}
+
+  </style>
+</head>
+<body>
+<h2>Jenkins Job URL 產生器</h2>
+
+<div class="layout">
+
+  <!-- 左側：設定面板 -->
+  <div class="panel panel-left">
+
+    <section class="card">
+      <h3>🎛 單一 Job 設定</h3>
+      <input id="username" value="primo"></input>
+      <input id="token" value="1123c8a9f17f0d51c7331b0e716e9d0542"></input>
+      
+
+      <label>國家</label>
+      <select id="country"></select>
+
+      <label>服務類型</label>
+      <select id="service"></select>
+
+      <label>Job</label>
+      <select id="job"></select>
+
+      <label>環境</label>
+      <select id="env"></select>
+
+      <label>Namespace</label>
+      <select id="namespace"></select>
+    </section>
+
+    <section class="card">
+      <h3>🌍 多國家選擇</h3>
+      <label>國家（可多選）</label>
+      <div id="countryList" class="options"></div>
+    </section>
+
+  </div>
+
+  <!-- 右側：輸出面板 -->
+  <div class="panel panel-right">
+
+    <section class="card">
+      <h3>🔗 Jenkins URL（單一）</h3>
+
+      <p>瀏覽 Job：</p>
+      <pre id="viewUrl"></pre>
+
+      <p>觸發建置（buildWithParameters）：</p>
+      <pre id="buildUrl"></pre>
+    </section>
+
+    <section class="card result">
+      <h3>📦 多選產出（共用設定 job env）</h3>
+      <button id="generateBtn">產出 URL</button>
+      <button onclick="copy()">📋 複製結果</button>
+      <pre id="output"></pre>
+    </section>
+
+  </div>
+
+</div>
+
+
+
+</body>
+</html>
+<script src="jenkins-curl-config.js"></script>
+<script>
+
+
+// ===== DOM =====
+const token = document.getElementById('token');
+const countrySelect = document.getElementById('country');
+const serviceSelect = document.getElementById('service');
+const jobSelect = document.getElementById('job');
+const output = document.getElementById('output');
+const envSelect = document.getElementById('env');
+const nsSelect = document.getElementById('namespace');
+const username = document.getElementById('username');
+
+const countryList = document.getElementById("countryList");
+
+const btn = document.getElementById("generateBtn");
+
+// ===== 初始化 =====
+initCountries();
+initServices();
+
+initEnvironments();
+initNamespaces();
+
+updateJobs();
+updateUrl();
+
+
+
+
+// 多國家
+/* ===== render countries ===== */
+Object.entries(config.countries).forEach(([key, c]) => {
+  const label = document.createElement("label");
+  label.innerHTML = `
+    <input type="checkbox" value="${key}">
+    ${c.name}
+  `;
+  countryList.appendChild(label);
+});
+
+/* ===== render services ===== */
+/*
+const services = config.jobs.deploy.services.pod.item;
+services.forEach(svc => {
+  const opt = document.createElement("option");
+  opt.value = svc;
+  opt.textContent = svc;
+  serviceSelect.appendChild(opt);
+});
+*/
+
+/* ===== URL builder ===== */
+function buildViewURL(country, service) {
+  return (
+    config.jenkins.base_url +
+    "job/" +
+    country.jenkins.path +
+    "/job/" +
+    service +
+    "/"
+  );
+}
+
+function buildBuildURL(country, service, params) {
+  const query = new URLSearchParams(params).toString();
+  return (
+    buildViewURL(country, service) +
+    "buildWithParameters?" +
+    query
+  );
+}
+
+/* ===== click handler ===== */
+btn.addEventListener("click", () => {
+  const selectedCountries = [
+    ...countryList.querySelectorAll("input:checked")
+  ].map(i => i.value);
+
+  const service = jobSelect.value;
+  const envType = document.getElementById("env").value; // beta / release
+
+  if (!selectedCountries.length) {
+    output.textContent = "⚠️ 請選擇至少一個國家";
+    return;
+  }
+
+  let result = "";
+
+  selectedCountries.forEach(code => {
+    const country = config.countries[code];
+    const env = country.environments[envType];
+
+    if (!env) return; // 該國家沒有這個環境就跳過
+
+    env.namespaces.forEach(ns => {
+      const params = {
+        //token: token.value,
+        branch: envSelect.value,   // 下一步會由 branch_modes 接管
+        namespace: ns
+      };
+      /*
+      result += `# ${country.name} - ${env.label}\n`;
+      result += `VIEW:\n${buildViewURL(country, service)}\n`;
+      result += `BUILD:\n${buildBuildURL(country, service, params)}\n\n`;
+      */
+      result += `sleep 5\n`;
+      result += `echo ${service} - ${params.namespace} - ${params.branch} - ${country.name} - ${env.label}\n`;
+        /*
+      result += `curl -I -X POST `;
+      result += ` -u ${username.value}:${token.value} `;
+      result += `"${buildBuildURL(country, service, params)}"\n`;
+   */
+    });
+  });
+
+  output.textContent = result;
+});
+
+//
+
+
+// ===== functions =====
+function initCountries() {
+  Object.entries(config.countries).forEach(([key, c]) => {
+    countrySelect.add(new Option(c.name, key));
+  });
+}
+
+function initServices() {
+  Object.entries(config.jobs.deploy.services).forEach(([key, s]) => {
+    serviceSelect.add(new Option(s.desc, key));
+  });
+}
+
+function updateJobs() {
+  jobSelect.innerHTML = '';
+  const service = serviceSelect.value;
+  const items = config.jobs.deploy.services[service].item;
+
+  items.forEach(job => {
+    jobSelect.add(new Option(job, job));
+  });
+}
+
+function updateUrlz() {
+    
+    /*
+  const country = countrySelect.value;
+  const service = serviceSelect.value;
+  const job = jobSelect.value;
+
+  const url =
+    `${config.jenkins.base_url}` +
+    `/job/${config.countries[country].jenkins.path}` +
+    `/job/${job}/`;
+
+  output.textContent = url;
+  */
+}
+
+//two url//
+function buildViewUrl() {
+  const country = countrySelect.value;
+  const job = jobSelect.value;
+
+  return (
+    config.jenkins.base_url +
+    'job/' +
+    config.countries[country].jenkins.path +
+    '/job/' +
+    job +
+    '/'
+  );
+}
+
+function buildTriggerUrl() {
+  const country = countrySelect.value;
+  const env = envSelect.value;
+  const namespace = nsSelect.value;
+  const job = jobSelect.value;
+
+  const branch = getBranchByEnv(country, env);
+
+  const params = new URLSearchParams({
+    //token: token.value,
+    branch: branch,
+    namespace: namespace
+  });
+
+  return (
+   //'test/' +
+    `curl -I -X POST -u ${username.value}:${token.value} "`+
+    config.jenkins.base_url +
+    'job/' +
+    config.countries[country].jenkins.path +
+    '/job/' +
+    job +
+    '/buildWithParameters?' +
+    params.toString()
+    +'"'
+  );
+}
+
+
+function updateUrl() {
+  document.getElementById('viewUrl').textContent = buildViewUrl();
+  document.getElementById('buildUrl').textContent = buildTriggerUrl();
+}
+//
+//env-type//
+function getBranchByEnv(countryCode, envKey) {
+  return config.countries[countryCode]
+    .environments[envKey]
+    .type;
+}
+
+
+//
+////
+
+// ===== events =====
+serviceSelect.addEventListener('change', () => {
+  updateJobs();
+  updateUrl();
+});
+
+countrySelect.addEventListener('change', updateUrl);
+jobSelect.addEventListener('change', updateUrl);
+envSelect.addEventListener('change', updateUrl);
+nsSelect.addEventListener('change', updateUrl);
+
+
+// =====  =====
+
+function initEnvironments() {
+  envSelect.innerHTML = '';
+  const country = countrySelect.value;
+  const envs = config.countries[country].environments;
+
+  Object.entries(envs).forEach(([key, env]) => {
+    envSelect.add(new Option(env.label, key));
+  });
+}
+
+function initNamespaces() {
+  nsSelect.innerHTML = '';
+  const country = countrySelect.value;
+  const env = envSelect.value;
+
+  const namespaces =
+    config.countries[country].environments[env].namespaces;
+
+  namespaces.forEach(ns => {
+    nsSelect.add(new Option(ns, ns));
+  });
+}
+
+function updateUrlo() {
+  const country = countrySelect.value;
+  const service = serviceSelect.value;
+  const job = jobSelect.value;
+
+  const url =
+    `${config.jenkins.base_url}` +
+    `/job/${config.countries[country].jenkins.path}` +
+    `/job/${job}/`;
+
+  output.textContent = url;
+}
+
+
+
+countrySelect.addEventListener('change', () => {
+  initEnvironments();
+  initNamespaces();
+  updateUrl();
+});
+
+envSelect.addEventListener('change', () => {
+  initNamespaces();
+});
+
+serviceSelect.addEventListener('change', () => {
+  updateJobs();
+  updateUrl();
+});
+
+envSelect.addEventListener('change', () => {
+  //updateJobs();
+  updateUrl();
+});
+
+nsSelect.addEventListener('change', () => {
+  //updateJobs();
+  updateUrl();
+});
+
+jobSelect.addEventListener('change', updateUrl);
+
+token.addEventListener('change', () => {
+ const token = document.getElementById('token');
+});
+
+
+function copy() {
+  navigator.clipboard.writeText(
+    document.getElementById('output').textContent
+  );
+  alert('已複製');
+}
+// =====  =====
+//curl -X POST -u primo:1123c8a9f17f0d51c7331b0e716e9d0542 "https://jenkins.yq-ops.top/job/test/buildWithParameters?aa=b"
+
+</script>

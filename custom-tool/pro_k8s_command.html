@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>K8s 指令生成器（進階版）</title>
+<style>
+
+
+body {
+  font-family: monospace;
+  background: #f6f6f6;
+  padding: 20px;
+  width: min(900px, 100%);
+  margin: auto;
+}
+h2 { margin-top: 0; }
+textarea, input, select {
+  width: 100%;
+  padding: 6px;
+  margin-bottom: 8px;
+  font-family: monospace;
+}
+textarea { height: 60px; }
+button {
+  padding: 6px 12px;
+  margin-right: 6px;
+  cursor: pointer;
+}
+.var-block {
+  border: 1px solid #ccc;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: #fff;
+}
+.safe { color: green; font-weight: bold; }
+.danger { color: red; font-weight: bold; }
+pre {
+  background: #111;
+  color: #0f0;
+  padding: 12px;
+  max-height: 300px;
+  overflow: auto;
+}
+
+/* 變數卡牌容器 */
+#vars {
+  display: flex;
+  flex-wrap: wrap;          /* 滿了自動換行 */
+  gap: 12px;                /* 卡牌間距 */
+  align-items: flex-start;
+}
+
+/* 單一變數卡牌 */
+.var-block {
+  width: 240px;             /* 卡牌寬度，可調 */
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+}
+
+/* 卡牌內 input / textarea 微調 */
+.var-block input,
+.var-block textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: monospace;
+}
+
+/* 刪除按鈕靠右 */
+.var-block button {
+  margin-top: 6px;
+  float: right;
+  background: #f5f5f5;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+
+.layout {
+  display: flex;
+  gap: 20px;
+}
+
+.section {
+  position: relative;
+  padding-top: 16px;
+}
+
+.section::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #ddd;
+}
+
+.left {
+  flex: 1;
+}
+
+.right {
+  flex: 1;
+}
+
+
+
+</style>
+</head>
+<body>
+
+<h2>🔧 K8s 指令生成器（內部工具版）</h2>
+<hr>
+<div class="layout">
+  <div class="section left">
+
+<label>📦 常用指令模板</label>
+
+<select id="templateSelect" onchange="applyTemplate()"></select>
+
+
+
+
+<label>✏️ 指令模板</label>
+<textarea id="template"></textarea>
+<div id="riskNote"></div>
+ </div>
+
+  <div class="section right">
+
+
+<div class="card">
+  <label>說明</label>
+
+
+
+  <p id="commandDesc" style="margin-top:8px;font-size:13px;color:#555;"></p>
+</div>
+
+ </div>
+</div>
+
+<hr>
+<h3>🔣 變數設定</h3>
+<button onclick="addVar()">➕ 新增變數</button>
+<hr>
+<div id="vars"></div>
+
+
+
+
+<label>🔀 組合方式</label>
+<select id="mode">
+  <option value="cross">排列組合（全部組合）</option>
+  <option value="zip">一對一對應</option>
+</select>
+
+<br><br>
+<button onclick="generate()">🚀 產生指令</button>
+<button onclick="copy()">📋 複製結果</button>
+
+<h3>📤 產生結果</h3>
+<pre id="output"></pre>
+
+
+
+<script>
+
+function addVar(name = '', value = '') {
+  const div = document.createElement('div');
+  div.className = 'var-block';
+  div.innerHTML = `
+    <label>變數名稱</label>
+    <input placeholder="例如 ns / deployment" value="${name}">
+    <label>變數值</label>
+    <textarea placeholder="支援 逗號 / 空格 / 換行">${value}</textarea>
+    <button onclick="this.parentNode.remove()">❌ 刪除</button>
+  `;
+  document.getElementById('vars').appendChild(div);
+}
+
+  function splitInput(text) {
+    return text
+      .split(/[\s,]+/)
+      .map(v => v.trim())
+      .filter(Boolean);
+  }
+
+function cartesian(arrays) {
+  return arrays.reduce((a, b) =>
+    a.flatMap(x => b.map(y => x.concat([y]))), [[]]);
+}
+
+function generate() {
+  const template = document.getElementById('template').value;
+  const blocks = document.querySelectorAll('.var-block');
+  const names = [];
+  const values = [];
+  
+
+  blocks.forEach(b => {
+    const n = b.querySelector('input').value;
+    const v = splitInput(b.querySelector('textarea').value);
+    if (n && v.length) {
+      names.push(n);
+      values.push(v);
+    }
+  });
+
+  let results = [];
+  const mode = document.getElementById('mode').value;
+
+  if (mode === 'cross') {
+    const combos = cartesian(values);
+    combos.forEach(c => {
+      let cmd = template;
+      c.forEach((val, i) => {
+        cmd = cmd.replace(new RegExp(`\\$\\{${names[i]}\\}`, 'g'), val);
+      });
+      results.push(cmd);
+    });
+  } else {
+    const len = Math.min(...values.map(v => v.length));
+    for (let i = 0; i < len; i++) {
+      let cmd = template;
+      names.forEach((n, idx) => {
+        cmd = cmd.replace(new RegExp(`\\$\\{${n}\\}`, 'g'), values[idx][i]);
+      });
+      results.push(cmd);
+    }
+  }
+
+  document.getElementById('output').textContent = results.join('\n');
+}
+
+function copy() {
+  navigator.clipboard.writeText(
+    document.getElementById('output').textContent
+  );
+  alert('已複製');
+}
+
+function applyTemplate() {
+  const sel = document.getElementById('templateSelect');
+  const opt = sel.options[sel.selectedIndex];
+  const desc = opt.dataset.desc;
+  document.getElementById('template').value = opt.value || '';
+
+  const risk = opt.dataset.risk;
+  const note = document.getElementById('riskNote');
+  if (risk === 'danger') {
+    note.innerHTML = '<p class="danger">⚠️ 此指令會實際影響線上資源，請確認後再執行</p>';
+  } else if (risk === 'safe') {
+    note.innerHTML = '<p class="safe">✅ 此指令為只讀操作，不會影響線上</p>';
+  } else {
+    note.innerHTML = '';
+  }
+   syncVarsFromTemplate();
+   document.getElementById('commandDesc').innerText = desc;
+}
+
+
+//
+function syncVarsFromTemplate() {
+  //先清空
+  vars.innerHTML='';
+  const template = document.getElementById('template').value;
+  if (!template) return;
+
+  // 1. 抓出 ${xxx}
+  const matches = [...template.matchAll(/\$\{(\w+)\}/g)];
+  const varsInTemplate = [...new Set(matches.map(m => m[1]))];
+
+  // 2. 目前已存在的變數
+  const existingVars = Array.from(
+    document.querySelectorAll('.var-block input')
+  ).map(input => input.value);
+
+  // 3. 新的才加
+  varsInTemplate.forEach(v => {
+    if (!existingVars.includes(v)) {
+      addVar(v);
+    }
+  });
+}
+//
+
+//
+
+
+
+function renderTemplateOptions() {
+  const select = document.getElementById('templateSelect');
+  select.innerHTML = '';
+
+  TEMPLATE_CONFIG.forEach(item => {
+    const opt = document.createElement('option');
+    opt.textContent = item.label;
+    opt.value = item.value;
+    if (item.risk) {
+      opt.dataset.risk = item.risk;
+    }
+    if (item.desc) {
+      opt.dataset.desc = item.desc;
+    }else{
+      opt.dataset.desc = '未填寫說明'
+    }
+    select.appendChild(opt);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderTemplateOptions();
+});
+
+
+
+//
+
+
+</script>
+<script src="pro-k8s-command-config.js"></script>
+</body>
+</html>
