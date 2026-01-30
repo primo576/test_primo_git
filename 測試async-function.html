@@ -1,0 +1,184 @@
+
+<style>
+/* 全局 */
+* {
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #0f172a; /* 深色，像 Jenkins console */
+  color: #e5e7eb;
+}
+
+/* App Layout */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* 上方控制區 */
+.control {
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  background: #020617;
+  border-bottom: 1px solid #1e293b;
+}
+
+.control button {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  background: #22c55e;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.control input {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  background: #020617;
+  color: #e5e7eb;
+  border: 1px solid #334155;
+}
+
+/* 狀態區 */
+.stats {
+  padding: 8px 12px;
+  background: #020617;
+  font-size: 14px;
+  border-bottom: 1px solid #1e293b;
+}
+
+/* Log 區（重點） */
+.log {
+  flex: 1;
+  padding: 8px;
+}
+
+#writee {
+  width: 100%;
+  height: 100%;
+  resize: none;
+  background: #020617;
+  color: #e5e7eb;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-y: auto;
+}
+
+/* 桌機優化（寬螢幕）
+@media (min-width: 900px) {
+  .control {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .stats,
+  .log {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+}
+ */
+</style>
+
+<div class="app">
+  <header class="control">
+    <button onclick="pipeline()">開始</button>
+    <input id="setrun" value="2" placeholder="大於這個數才成功">
+    <input id="restnum" value="5" placeholder="清版">
+  </header>
+
+  <section class="stats">
+    <p id="calccount">贏 ：0 輸： 0 輸贏共計：0 總倫次：0 清版：0</p>
+  </section>
+
+  <section class="log">
+    <textarea id="writee" readonly></textarea>
+  </section>
+</div>
+
+
+<script>
+const writee = document.getElementById('writee');
+const calccount = document.getElementById('calccount');
+let restcount=0;
+let momeycount=0;
+let lostcount=0;
+function step(name, ms) {
+  return new Promise((resolve, reject) => {
+    const r = Math.floor(Math.random() * 10); // 0–9
+
+    writee.textContent += `開始 ${name}（亂數=${r}）\n`;
+    //console.log(`開始 ${name}（亂數=${r}）`);
+
+    setTimeout(() => {
+      if (r < document.getElementById('setrun').value) {
+        writee.textContent += `❌ 失敗 ${name}\n`;
+        scrollLog();
+        //console.error(`失敗 ${name}`);
+        reject(new Error(`${name} 部署失敗`));   // ⬅️ 中斷點
+      } else {
+        writee.textContent += `✅ 完成 ${name}\n`;
+        scrollLog();
+        //console.log(`完成 ${name}`);
+        resolve(name);
+      }
+    }, ms);
+  });
+}
+
+function rest(){
+    restcount++;
+    if (restcount>document.getElementById('restnum').value &&  document.getElementById('restnum').value!=0) {
+        writee.textContent=""
+        restcount=0;
+    }
+    //writee.textContent+="count"+restcount+"\n";
+}
+
+function scrollLog() {
+  writee.scrollTop = writee.scrollHeight;
+}
+
+
+async function pipeline() {
+ rest()
+
+  const timed = new Date();
+  writee.textContent += `🚀 pipeline start: ${timed}\n`;
+
+  try {
+    await step("step1: checkout", 2000);
+    await step("step2: build", 3000);
+    await step("step3: deploy", 1600);
+    writee.textContent += `🎉 pipeline done\n`;
+   // console.log("🎉 pipeline done");
+    momeycount++;
+  } catch (err) {
+    writee.textContent += `🛑 pipeline aborted: ${err.message}\n`;
+    //console.error("pipeline aborted", err);
+    lostcount++;
+  }finally{
+    pipeline();
+    calccount.textContent = `贏 ：${momeycount} 輸： ${lostcount} 輸贏共計：${momeycount-lostcount} 總倫次：${momeycount+lostcount} 清版：${restcount}`;
+    
+  }
+}
+
+//pipeline();
+
+
+</script>
