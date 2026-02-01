@@ -159,14 +159,15 @@
   <h3>🔣 變數設定</h3>
   <button onclick="addVar()">➕ 新增變數</button>
 <button id="clearVarsBtn">🗑️ 清空暫存變數</button>
+<button id="clearHistoryBtn">🗑️ 清空歷史紀錄</button>
 
   <hr />
   <div id="vars"></div>
 
   <label>🔀 組合方式</label>
   <select id="mode">
-    <option value="cross">排列組合（全部組合）</option>
     <option value="zip">一對一對應</option>
+    <option value="cross">排列組合（全部組合）</option>
   </select>
 
   <br /><br />
@@ -176,6 +177,10 @@
 
   <h3>📤 產生結果</h3>
   <pre id="output"></pre>
+
+  <h3>🕘 指令產生歷史</h3>
+<div id="history"></div>
+
 
 
 </body>

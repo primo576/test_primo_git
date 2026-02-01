@@ -1,5 +1,7 @@
-
-    function addVar(name = '', value = '') {
+/*************************************************
+ * 變數卡牌
+ *************************************************/
+function addVar(name = '', value = '') {
   const div = document.createElement('div');
   div.className = 'var-block';
   div.innerHTML = `
@@ -14,11 +16,9 @@
   const textarea = div.querySelector('textarea');
   const btn = div.querySelector('button');
 
-  // ✅ 監聽變更 → 存 localStorage
   input.addEventListener('input', saveVars);
   textarea.addEventListener('input', saveVars);
 
-  // ✅ 刪除也要存
   btn.addEventListener('click', () => {
     div.remove();
     saveVars();
@@ -28,101 +28,116 @@
 }
 
 
-    function splitInput(text) {
-      return text
-        .split(/[\s,]+/)
-        .map(v => v.trim())
-        .filter(Boolean);
+/*************************************************
+ * 指令產生
+ *************************************************/
+function splitInput(text) {
+  return text
+    .split(/[\s,]+/)
+    .map(v => v.trim())
+    .filter(Boolean);
+}
+
+function cartesian(arrays) {
+  return arrays.reduce(
+    (a, b) => a.flatMap(x => b.map(y => x.concat([y]))),
+    [[]]
+  );
+}
+
+function generate() {
+  const template = document.getElementById('template').value;
+  const blocks = document.querySelectorAll('.var-block');
+  const names = [];
+  const values = [];
+
+  blocks.forEach(b => {
+    const n = b.querySelector('input').value;
+    const v = splitInput(b.querySelector('textarea').value);
+    if (n && v.length) {
+      names.push(n);
+      values.push(v);
     }
+  });
 
-    function cartesian(arrays) {
-      return arrays.reduce(
-        (a, b) => a.flatMap(x => b.map(y => x.concat([y]))),
-        [[]]
-      );
-    }
+  const mode = document.getElementById('mode').value;
+  const results = [];
 
-    function generate() {
-      const template = document.getElementById('template').value;
-      const blocks = document.querySelectorAll('.var-block');
-      const names = [];
-      const values = [];
-
-      blocks.forEach(b => {
-        const n = b.querySelector('input').value;
-        const v = splitInput(b.querySelector('textarea').value);
-        if (n && v.length) {
-          names.push(n);
-          values.push(v);
-        }
+  if (mode === 'cross') {
+    cartesian(values).forEach(combo => {
+      let cmd = template;
+      combo.forEach((val, i) => {
+        cmd = cmd.replace(
+          new RegExp(`\\$\\{${names[i]}\\}`, 'g'),
+          val
+        );
       });
-
-      const mode = document.getElementById('mode').value;
-      const results = [];
-
-      if (mode === 'cross') {
-        cartesian(values).forEach(combo => {
-          let cmd = template;
-          combo.forEach((val, i) => {
-            cmd = cmd.replace(new RegExp(`\\$\\{${names[i]}\\}`, 'g'), val);
-          });
-          results.push(cmd);
-        });
-      } else {
-        const len = Math.min(...values.map(v => v.length));
-        for (let i = 0; i < len; i++) {
-          let cmd = template;
-          names.forEach((n, idx) => {
-            cmd = cmd.replace(
-              new RegExp(`\\$\\{${n}\\}`, 'g'),
-              values[idx][i]
-            );
-          });
-          results.push(cmd);
-        }
-      }
-
-      document.getElementById('output').textContent = results.join('\n');
-      saveVars()
+      results.push(cmd);
+    });
+  } else {
+    const len = Math.min(...values.map(v => v.length));
+    for (let i = 0; i < len; i++) {
+      let cmd = template;
+      names.forEach((n, idx) => {
+        cmd = cmd.replace(
+          new RegExp(`\\$\\{${n}\\}`, 'g'),
+          values[idx][i]
+        );
+      });
+      results.push(cmd);
     }
+  }
 
-    function copy() {
-      navigator.clipboard.writeText(
-        document.getElementById('output').textContent
-      );
-      alert('已複製');
-    }
+  const outputText = results.join('\n');
+  document.getElementById('output').textContent = outputText;
 
-    function applyTemplate() {
-      const sel = document.getElementById('templateSelect');
-      const opt = sel.options[sel.selectedIndex];
+  saveVars();
+  saveHistory(template, outputText);
+}
 
-      document.getElementById('template').value = opt.value || '';
-      document.getElementById('commandDesc').innerText =
-        opt.dataset.desc || '未填寫說明';
+function copy() {
+  navigator.clipboard.writeText(
+    document.getElementById('output').textContent
+  );
+  alert('已複製');
+}
 
-      const note = document.getElementById('riskNote');
-      if (opt.dataset.risk === 'danger') {
-        note.innerHTML =
-          '<p class="danger">⚠️ 此指令會實際影響線上資源，請確認後再執行</p>';
-      } else if (opt.dataset.risk === 'safe') {
-        note.innerHTML =
-          '<p class="safe">✅ 此指令為只讀操作，不會影響線上</p>';
-      } else {
-        note.innerHTML = '';
-      }
-      syncVarsFromTemplate();
-      //儲存
-      localStorage.setItem(
+
+/*************************************************
+ * Template 套用
+ *************************************************/
+function applyTemplate() {
+  const sel = document.getElementById('templateSelect');
+  const opt = sel.options[sel.selectedIndex];
+
+  document.getElementById('template').value = opt.value || '';
+  document.getElementById('commandDesc').innerText =
+    opt.dataset.desc || '未填寫說明';
+
+  const note = document.getElementById('riskNote');
+  if (opt.dataset.risk === 'danger') {
+    note.innerHTML =
+      '<p class="danger">⚠️ 此指令會實際影響線上資源，請確認後再執行</p>';
+  } else if (opt.dataset.risk === 'safe') {
+    note.innerHTML =
+      '<p class="safe">✅ 此指令為只讀操作，不會影響線上</p>';
+  } else {
+    note.innerHTML = '';
+  }
+
+  syncVarsFromTemplate();
+
+  localStorage.setItem(
     'lastTemplateIndex',
-    document.getElementById('templateSelect').selectedIndex
-    );
-  //儲存
-    }
+    sel.selectedIndex
+  );
+}
 
-  
-  //
-  function loadVarsFromStorage() {
+
+/*************************************************
+ * Vars 同步邏輯
+ *************************************************/
+function loadVarsFromStorage() {
   const raw = JSON.parse(localStorage.getItem('vars') || '[]');
   const map = new Map();
 
@@ -153,116 +168,99 @@ function getVarsFromDOM() {
   return map;
 }
 
-//
-  function syncVarsFromTemplate() {
-  const varsContainer = document.getElementById('vars');
-
-  // 1️⃣ 來源
+function syncVarsFromTemplate() {
   const storageMap = loadVarsFromStorage();
   const templateSet = getVarsFromTemplate();
   const domMap = getVarsFromDOM();
 
-  // 2️⃣ 最終應存在的變數（Map）
   const finalMap = new Map();
 
-  // 👉 storage 優先
   storageMap.forEach((value, name) => {
     if (templateSet.has(name)) {
       finalMap.set(name, value);
     }
   });
 
-  // 👉 template 補缺
   templateSet.forEach(name => {
     if (!finalMap.has(name)) {
       finalMap.set(name, '');
     }
   });
 
-  // 3️⃣ 補「應該有但畫面沒有的」
   finalMap.forEach((value, name) => {
     if (!domMap.has(name)) {
       addVar(name, value);
     }
   });
 
-  // 4️⃣ 刪「畫面有但不該存在的」
   document.querySelectorAll('.var-block').forEach(b => {
     const name = b.querySelector('input')?.value;
     if (name && !finalMap.has(name)) {
       b.remove();
     }
   });
-
-  // 5️⃣ 同步一次 storage（防止殘留）
-  //saveVars();
 }
 
 
+/*************************************************
+ * Template 選單 / Group
+ *************************************************/
+function renderTemplateOptions(arr) {
+  const select = document.getElementById('templateSelect');
+  select.innerHTML = '';
 
+  arr.forEach(item => {
+    const opt = document.createElement('option');
+    opt.textContent = item.label;
+    opt.value = item.value;
+    opt.dataset.risk = item.risk || '';
+    opt.dataset.desc = item.desc || '未填寫說明';
+    select.appendChild(opt);
+  });
 
-    function renderTemplateOptions(arr) {
-      const select = document.getElementById('templateSelect');
-      select.innerHTML = '';
-
-      arr.forEach(item => {
-        const opt = document.createElement('option');
-        opt.textContent = item.label;
-        opt.value = item.value;
-        opt.dataset.risk = item.risk || '';
-        opt.dataset.desc = item.desc || '未填寫說明';
-        select.appendChild(opt);
-      });
-      //還原
-      const lastIndex = localStorage.getItem('lastTemplateIndex');
-if (lastIndex !== null && select.options[lastIndex]) {
-  select.selectedIndex = lastIndex;
-  applyTemplate();
+  const lastIndex = localStorage.getItem('lastTemplateIndex');
+  if (lastIndex !== null && select.options[lastIndex]) {
+    select.selectedIndex = lastIndex;
+    applyTemplate();
+  }
 }
 
-    }
+const groupSelect = document.getElementById('templateGroup');
 
-    const groupSelect = document.getElementById('templateGroup');
+function renderGroupSelect() {
+  groupSelect.innerHTML = '';
 
-    function renderGroupSelect() {
-      groupSelect.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.textContent = '指令集';
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  groupSelect.appendChild(placeholder);
 
-      const placeholder = document.createElement('option');
-      placeholder.textContent = '指令集';
-      placeholder.disabled = true;
-      placeholder.selected = true;
-      groupSelect.appendChild(placeholder);
+  Object.keys(ALL_TEMPLATE).forEach(key => {
+    const option = document.createElement('option');
+    option.value = key;
+    option.textContent = key.replace('_TEMPLATE_CONFIG', '');
+    groupSelect.appendChild(option);
+  });
+}
 
-      Object.keys(ALL_TEMPLATE).forEach(key => {
-        const option = document.createElement('option');
-        option.value = key;
-        option.textContent = key.replace('_TEMPLATE_CONFIG', '');
-        groupSelect.appendChild(option);
-      });
-    }
+groupSelect.addEventListener('change', e => {
+  const groupKey = e.target.value;
+  localStorage.setItem('lastGroup', groupKey);
 
-    groupSelect.addEventListener('change', e => {
-      const groupKey = e.target.value;
-      localStorage.setItem('lastGroup', groupKey);   //儲存
-        try {
-      if (ALL_TEMPLATE[groupKey]) {
-        renderTemplateOptions(ALL_TEMPLATE[groupKey]);
-        rendersearch=ALL_TEMPLATE[groupKey]
-      }
-        } catch {}
-
-    });
-
-    document.addEventListener('DOMContentLoaded', () => {
-      renderGroupSelect();
-      renderTemplateOptions(ALL_TEMPLATE['KUBECTL_TEMPLATE_CONFIG']);
-    });
+  if (ALL_TEMPLATE[groupKey]) {
+    renderTemplateOptions(ALL_TEMPLATE[groupKey]);
+    rendersearch = ALL_TEMPLATE[groupKey];
+  }
+});
 
 
-    //搜索功能
-    rendersearch=ALL_TEMPLATE['KUBECTL_TEMPLATE_CONFIG']
+/*************************************************
+ * 搜尋功能
+ *************************************************/
+let rendersearch = ALL_TEMPLATE['KUBECTL_TEMPLATE_CONFIG'];
 
- const select = document.getElementById('cmdSelect');
+const select = document.getElementById('cmdSelect');
 const search = document.getElementById('search');
 const textarea = document.getElementById('template');
 
@@ -270,16 +268,15 @@ function render(options) {
   select.innerHTML = '';
   options.forEach((t, index) => {
     const opt = document.createElement('option');
-    opt.value = index;              // ⭐ 用 index 對應 TEMPLATE
+    opt.value = index;
     opt.textContent = t.label;
-    opt.dataset.command = t.value; // ⭐ 真正的指令
+    opt.dataset.command = t.value;
     select.appendChild(opt);
   });
 }
 
 search.addEventListener('input', e => {
   const keyword = e.target.value.toLowerCase();
-
   render(
     rendersearch.filter(t =>
       t.label.toLowerCase().includes(keyword) ||
@@ -288,25 +285,109 @@ search.addEventListener('input', e => {
   );
 });
 
-select.addEventListener('change', e => {
-  const option = e.target.selectedOptions[0];
-  if (!option) return;
-
-  textarea.value = option.dataset.command;
+select.addEventListener('change', () => {
+  const option = select.selectedOptions[0];
+  if (option) textarea.value = option.dataset.command;
 });
 
 select.addEventListener('dblclick', () => {
   const option = select.selectedOptions[0];
-  if (!option) return;
-  textarea.value = option.dataset.command;
-  
+  if (option) textarea.value = option.dataset.command;
 });
-    //搜索功能
 
 
-//render(TEMPLATE_CONFIG);
-//儲存
+/*************************************************
+ * Vars 儲存 / 還原
+ *************************************************/
+function saveVars() {
+  const vars = [];
+
+  document.querySelectorAll('.var-block').forEach(b => {
+    const value = b.querySelector('textarea').value;
+    if (value !== '') {
+      vars.push({
+        name: b.querySelector('input').value,
+        value
+      });
+    }
+  });
+
+  localStorage.setItem('vars', JSON.stringify(vars));
+}
+
+function loadVars() {
+  vars.innerHTML = '';
+  const saved = JSON.parse(localStorage.getItem('vars') || '[]');
+  saved.forEach(v => addVar(v.name, v.value));
+}
+
+
+/*************************************************
+ * History
+ *************************************************/
+const HISTORY_KEY = 'command_history';
+
+function nowString() {
+  return new Date().toLocaleString('zh-TW', { hour12: false });
+}
+
+function saveHistory(template, output) {
+  if (!output.trim()) return;
+
+  const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+
+  history.unshift({
+    time: nowString(),
+    template,
+    output
+  });
+
+  localStorage.setItem(
+    HISTORY_KEY,
+    JSON.stringify(history.slice(0, 50))
+  );
+
+  renderHistory();
+}
+
+function renderHistory() {
+  const container = document.getElementById('history');
+  container.innerHTML = '';
+
+  try {
+    const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+
+    history.forEach(item => {
+      const div = document.createElement('div');
+      div.style.cssText = `
+        border:1px solid #ccc;
+        padding:6px;
+        margin-bottom:6px;
+        cursor:pointer;
+        background:#fff;
+      `;
+
+      div.innerHTML = `
+        <div style="font-size:12px;color:#666;">${item.time}</div>
+        <div style="font-size:13px;">${item.template}</div>
+      `;
+
+      div.addEventListener('click', () => {
+        document.getElementById('output').textContent = item.output;
+      });
+
+      container.appendChild(div);
+    });
+  } catch {}
+}
+
+
+/*************************************************
+ * 初始化 / 事件
+ *************************************************/
 document.addEventListener('DOMContentLoaded', () => {
+  renderGroupSelect();
+
   const lastGroup = localStorage.getItem('lastGroup');
   if (lastGroup && ALL_TEMPLATE[lastGroup]) {
     groupSelect.value = lastGroup;
@@ -314,60 +395,36 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     renderTemplateOptions(ALL_TEMPLATE['KUBECTL_TEMPLATE_CONFIG']);
   }
+
   loadVars();
   syncVarsFromTemplate();
+  renderHistory();
 });
 
-document.getElementById('template').addEventListener('input', e => {
-  localStorage.setItem('lastTemplateText', e.target.value);
-});
-
-const lastText = localStorage.getItem('lastTemplateText');
-if (lastText) {
-  document.getElementById('template').value = lastText;
-}
-
-
-//記住變數卡牌
-function saveVars() {
-  const vars = [];
-  document.querySelectorAll('.var-block').forEach(b => {
-    if (b.querySelector('textarea').value!="") {
-          vars.push({
-      name: b.querySelector('input').value,
-      
-      value: b.querySelector('textarea').value
-    });
-    }
-
-  });
-  localStorage.setItem('vars', JSON.stringify(vars));
-}
-
-function loadVars() {
-  vars.innerHTML=""
-  const saved = JSON.parse(localStorage.getItem('vars') || '[]');
-  saved.forEach(v => addVar(v.name, v.value));
-}
-
-
-// template 改變時
 document.getElementById('template')
   .addEventListener('input', syncVarsFromTemplate);
 
-// 頁面初始化
-//syncVars();
+document.getElementById('clearVarsBtn')
+  .addEventListener('click', () => {
+    if (!confirm('確定要清空所有暫存變數嗎？')) return;
+    localStorage.removeItem('vars');
+    document.getElementById('vars').innerHTML = '';
+    syncVarsFromTemplate();
+  });
 
-//
+document.getElementById('clearHistoryBtn')
+  .addEventListener('click', () => {
+    if (!confirm('確定要清空所有歷史紀錄？')) return;
+    localStorage.removeItem(HISTORY_KEY);
+    renderHistory();
+  });
 
-document.getElementById('clearVarsBtn').addEventListener('click', () => {
-  if (!confirm('確定要清空所有暫存變數嗎？此動作無法復原')) return;
+document.getElementById('mode')
+  .addEventListener('change', e =>
+    localStorage.setItem('mode', e.target.value)
+  );
 
-  localStorage.removeItem('vars');
-  document.getElementById('vars').innerHTML = '';
-  //syncVars();
-  syncVarsFromTemplate();
-});
-
-
-
+const savedMode = localStorage.getItem('mode');
+if (savedMode) {
+  document.getElementById('mode').value = savedMode;
+}
