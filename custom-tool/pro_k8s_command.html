@@ -2,9 +2,9 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8" />
-  <title>K8s 指令生成器（進階版）</title>
+  <title>指令生成器（進階版）</title>
 
-  <script src="pro-k8s-command-config.js"></script>
+  
 
   <style>
     body {
@@ -113,13 +113,17 @@
       border: 1px solid #ccc;
       border-radius: 4px;
     }
+  .hiden{
+    visibility: hidden;
+    display:none
+  }
   </style>
 </head>
 
 <body>
   <div class="layout">
     <div class="section left">
-      <h2>🔧 K8s 指令生成器（內部工具版）</h2>
+      <h2>🔧 指令生成器（內部工具版）</h2>
     </div>
     <div class="section right">
       <select id="templateGroup"></select>
@@ -135,6 +139,11 @@
 
       <label>✏️ 指令模板</label>
       <textarea id="template"></textarea>
+      <div class="hiden">
+     <input id="search" placeholder="搜尋指令（log / ingress / crash）">
+<select id="cmdSelect" size="10"></select>
+
+</div>
 
       <div id="riskNote"></div>
     </div>
@@ -149,6 +158,7 @@
 
   <h3>🔣 變數設定</h3>
   <button onclick="addVar()">➕ 新增變數</button>
+<button id="clearVarsBtn">🗑️ 清空暫存變數</button>
 
   <hr />
   <div id="vars"></div>
@@ -167,163 +177,9 @@
   <h3>📤 產生結果</h3>
   <pre id="output"></pre>
 
-  <script>
-    function addVar(name = '', value = '') {
-      const div = document.createElement('div');
-      div.className = 'var-block';
-      div.innerHTML = `
-        <label>變數名稱</label>
-        <input placeholder="例如 ns / deployment" value="${name}">
-        <label>變數值</label>
-        <textarea placeholder="支援 逗號 / 空格 / 換行">${value}</textarea>
-        <button onclick="this.parentNode.remove()">❌ 刪除</button>
-      `;
-      document.getElementById('vars').appendChild(div);
-    }
 
-    function splitInput(text) {
-      return text
-        .split(/[\s,]+/)
-        .map(v => v.trim())
-        .filter(Boolean);
-    }
-
-    function cartesian(arrays) {
-      return arrays.reduce(
-        (a, b) => a.flatMap(x => b.map(y => x.concat([y]))),
-        [[]]
-      );
-    }
-
-    function generate() {
-      const template = document.getElementById('template').value;
-      const blocks = document.querySelectorAll('.var-block');
-      const names = [];
-      const values = [];
-
-      blocks.forEach(b => {
-        const n = b.querySelector('input').value;
-        const v = splitInput(b.querySelector('textarea').value);
-        if (n && v.length) {
-          names.push(n);
-          values.push(v);
-        }
-      });
-
-      const mode = document.getElementById('mode').value;
-      const results = [];
-
-      if (mode === 'cross') {
-        cartesian(values).forEach(combo => {
-          let cmd = template;
-          combo.forEach((val, i) => {
-            cmd = cmd.replace(new RegExp(`\\$\\{${names[i]}\\}`, 'g'), val);
-          });
-          results.push(cmd);
-        });
-      } else {
-        const len = Math.min(...values.map(v => v.length));
-        for (let i = 0; i < len; i++) {
-          let cmd = template;
-          names.forEach((n, idx) => {
-            cmd = cmd.replace(
-              new RegExp(`\\$\\{${n}\\}`, 'g'),
-              values[idx][i]
-            );
-          });
-          results.push(cmd);
-        }
-      }
-
-      document.getElementById('output').textContent = results.join('\n');
-    }
-
-    function copy() {
-      navigator.clipboard.writeText(
-        document.getElementById('output').textContent
-      );
-      alert('已複製');
-    }
-
-    function applyTemplate() {
-      const sel = document.getElementById('templateSelect');
-      const opt = sel.options[sel.selectedIndex];
-
-      document.getElementById('template').value = opt.value || '';
-      document.getElementById('commandDesc').innerText =
-        opt.dataset.desc || '未填寫說明';
-
-      const note = document.getElementById('riskNote');
-      if (opt.dataset.risk === 'danger') {
-        note.innerHTML =
-          '<p class="danger">⚠️ 此指令會實際影響線上資源，請確認後再執行</p>';
-      } else if (opt.dataset.risk === 'safe') {
-        note.innerHTML =
-          '<p class="safe">✅ 此指令為只讀操作，不會影響線上</p>';
-      } else {
-        note.innerHTML = '';
-      }
-
-      syncVarsFromTemplate();
-    }
-
-    function syncVarsFromTemplate() {
-      const varsEl = document.getElementById('vars');
-      varsEl.innerHTML = '';
-
-      const template = document.getElementById('template').value;
-      if (!template) return;
-
-      const matches = [...template.matchAll(/\$\{(\w+)\}/g)];
-      const uniqueVars = [...new Set(matches.map(m => m[1]))];
-
-      uniqueVars.forEach(v => addVar(v));
-    }
-
-    function renderTemplateOptions(arr) {
-      const select = document.getElementById('templateSelect');
-      select.innerHTML = '';
-
-      arr.forEach(item => {
-        const opt = document.createElement('option');
-        opt.textContent = item.label;
-        opt.value = item.value;
-        opt.dataset.risk = item.risk || '';
-        opt.dataset.desc = item.desc || '未填寫說明';
-        select.appendChild(opt);
-      });
-    }
-
-    const groupSelect = document.getElementById('templateGroup');
-
-    function renderGroupSelect() {
-      groupSelect.innerHTML = '';
-
-      const placeholder = document.createElement('option');
-      placeholder.textContent = '指令集';
-      placeholder.disabled = true;
-      placeholder.selected = true;
-      groupSelect.appendChild(placeholder);
-
-      Object.keys(ALL_TEMPLATE).forEach(key => {
-        const option = document.createElement('option');
-        option.value = key;
-        option.textContent = key.replace('_TEMPLATE_CONFIG', '');
-        groupSelect.appendChild(option);
-      });
-    }
-
-    groupSelect.addEventListener('change', e => {
-      const groupKey = e.target.value;
-      if (ALL_TEMPLATE[groupKey]) {
-        renderTemplateOptions(ALL_TEMPLATE[groupKey]);
-      }
-    });
-
-    document.addEventListener('DOMContentLoaded', () => {
-      renderGroupSelect();
-      renderTemplateOptions(ALL_TEMPLATE['KUBECTL_TEMPLATE_CONFIG']);
-    });
-  </script>
 </body>
 </html>
+<script src="pro-k8s-command-data.js"></script>
+<script src="pro-k8s-command-config.js"></script>
+
