@@ -201,6 +201,94 @@ br get ingress gocron.com -n gocron -o yaml`
     desc: '刪除 Deployment（不可逆）'
   },
 
+  {
+  label: 'kubectl edit',
+  value: 'kubectl edit ${resource} ${name} -n ${namespace}',
+  risk: 'danger',
+  desc: `
+用途：
+- 直接在線上編輯 Kubernetes 資源（Deployment / Service / Ingress 等）
+- 適合臨時調整、快速修 bug、緊急排錯
+
+行為特性：
+- 存檔即生效（立即 PATCH 到 API Server）
+- 不存檔直接離開 = 不會有任何變更
+- 無版本控管、不可 review
+
+風險說明：
+- 容易手滑改錯（尤其是 Ingress、Selector、Image）
+- 變更立即影響線上流量
+- 不適合長期或正式設定
+
+常見使用情境：
+- 臨時改 Ingress host / path
+- 緊急修正 annotation
+- 快速驗證設定是否可行
+| 你看到的              | resource     |
+| --------------------| ------------ |
+| kubectl get pod     | pod        |
+| kubectl get svc     | service   |
+| kubectl get deploy  | deployment |
+| kubectl get ingress | ingress    |
+| kubectl get cm      | configmap  |
+| kubectl get secret  | secret    |
+<name>
+kubectl get ingress -n gocron
+
+edit 背後在做什麼（你應該知道的）
+kubectl edit 本質是：
+把目前資源抓下來
+開成暫存檔
+存檔時 → kubectl apply
+👉 所以 效果等同於 apply`
+},
+
+{
+  label: 'kubectl apply',
+  value: 'kubectl apply -f ${file_yaml}',
+  risk: 'danger',
+  desc: `
+用途：
+- 將檔案中的 YAML 宣告式套用到叢集
+- 正式部署、設定變更的標準方式
+
+行為特性：
+- 會對現有資源做 create / update
+- 可搭配 Git 進行版本控管（GitOps）
+- 變更是可重現的
+
+風險說明：
+- YAML 若錯誤會直接影響線上
+- 不小心 apply 錯 namespace / 檔案，影響範圍可能很大
+- managedFields、selector、volume 改錯可能造成 service 中斷
+
+常見使用情境：
+- CI/CD pipeline
+- Deployment / Ingress 正式上線
+- 設定回滾（rollback）`
+},
+
+{
+  label: 'kubectl diff',
+  value: 'kubectl diff -f ${file_yaml}',
+  risk: 'safe',
+  desc: `
+用途：
+- 比對本地 YAML 與線上資源的差異
+- 預覽 apply 後會發生什麼事
+
+行為特性：
+- 不會對叢集造成任何修改
+- 適合在 apply 前做檢查
+
+常見使用情境：
+- production apply 前驗證
+- Code Review 輔助
+`
+},
+
+
+
   // ======================
   // 8. 參考模板
   // ======================
@@ -213,15 +301,23 @@ br get ingress gocron.com -n gocron -o yaml`
   {
     label: 'Ingress backend 區塊（gocron 範例）',
     risk: 'safe',
-    value: `- backend:
-  service:
-    name: gocron-\${ns}
-    port:
-      number: 80
-path: /\${ns}(/|$)(.*)
-pathType: ImplementationSpecific`,
-    desc: `Ingress rules 片段
-請確認 namespace / service 存在`
+    value: `      - backend:
+          service:
+            name: gocron-\${ns}
+            port:
+              number: 80
+        path: /x\${ns}(/|$)(.*)
+        pathType: ImplementationSpecific`,
+    desc: `br edit ingress gocron.com -n gocron 
+ph edit ingress gocron -n gocron 
+Ingress rules 片段
+請確認 namespace / service 存在
+保存在推流程
+kubectl get ingress gocron.com -n gocron -o yaml > ingress.yaml
+vim ingress.yaml
+kubectl apply -f ingress.yaml
+如果要看log
+kubectl logs -n ingress-nginx deploy/ingress-nginx-controller | tail -n 50`
   }
 ],
 
@@ -550,3 +646,5 @@ LINUX_BASIC_TEMPLATE_CONFIG : [
 
 
 }
+
+

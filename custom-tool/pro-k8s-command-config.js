@@ -111,7 +111,7 @@ function applyTemplate() {
   const opt = sel.options[sel.selectedIndex];
 
   document.getElementById('template').value = opt.value || '';
-  document.getElementById('commandDesc').innerText =
+  document.getElementById('commandDesc').innerHTML =
     opt.dataset.desc || '未填寫說明';
 
   const note = document.getElementById('riskNote');

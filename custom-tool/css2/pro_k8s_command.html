@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <title>🐇指令生成器（進階版）</title>
+
+  
+
+  <style>
+    
+  .hiden{
+
+    display:none
+  }
+    .hiden2{
+    visibility: hidden;
+    display:none
+  }
+
+/* Vars */
+    #vars {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .var-block {
+      width: 240px;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 10px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    }
+
+    .var-block input,
+    .var-block textarea {
+      width: 100%;
+      box-sizing: border-box;
+      font-family: monospace;
+    }
+
+    .var-block button {
+      margin-top: 6px;
+      float: right;
+      background: #f5f5f5;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+ body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont;
+  background: #f4f6f8;
+  color: #222;
+}
+
+/* ===== Header ===== */
+.app-header {
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+  padding: 12px 16px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+button {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background: #fff;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #f0f0f0;
+}
+
+/* ===== Main Layout ===== */
+.app-main {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1.2fr;
+  gap: 12px;
+  padding: 12px;
+  height: calc(100vh - 120px);
+  box-sizing: border-box;
+}
+
+/* ===== Panels ===== */
+.panel {
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel h3 {
+  margin: 8px 0;
+  font-size: 14px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 4px;
+}
+
+/* ===== Scrollable areas ===== */
+.template-panel textarea,
+#vars,
+#history,
+#output {
+  flex: 1;
+  overflow: auto;
+}
+
+textarea {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+}
+
+/* ===== Output ===== */
+#output {
+  background: #111;
+  color: #0f0;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+/* ===== History ===== */
+#history {
+  font-size: 12px;
+  border-top: 1px solid #eee;
+  padding-top: 6px;
+}
+
+
+
+
+  </style>
+</head>
+
+<body>
+  <!-- ===== Header ===== -->
+  <header class="app-header">
+    <div class="layout">
+      <div class="section left">
+        <h2>🐇 指令生成器（內部工具版）🔧</h2>
+      </div>
+      <div class="section right">
+        <select id="templateGroup"></select>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <button onclick="generate()">🚀 產生指令</button>
+      <button onclick="copy()">📋 複製結果</button>
+      <button onclick="addVar()">➕ 新增變數</button>
+      <button id="clearVarsBtn">🗑️ 清空暫存變數</button>
+      <button id="clearHistoryBtn">🗑️ 清空歷史紀錄</button>
+      <button id="searchDisploy">模板搜索</button>
+    </div>
+  </header>
+
+  <!-- ===== Main Layout ===== -->
+  <main class="app-main">
+
+    <!-- ===== 左側：模板區 ===== -->
+    <section class="panel template-panel">
+      <h3>📦 常用指令模板</h3>
+      <select id="templateSelect" onchange="applyTemplate()"></select>
+
+      <h3>✏️ 指令模板</h3>
+      <textarea id="template"></textarea>
+
+      <div class="hiden">
+        <input id="search" placeholder="搜尋指令（log / ingress / crash）">
+        <select id="cmdSelect" size="10"></select>
+      </div>
+
+      <div id="riskNote"></div>
+
+      <h3>說明</h3>
+      <p id="commandDesc"></p>
+    </section>
+
+    <!-- ===== 中間：變數區 ===== -->
+    <section class="panel vars-panel">
+      <h3>🔧 變數設定</h3>
+      <div id="vars"></div>
+
+      <h3>🔀 組合方式</h3>
+      <select id="mode">
+        <option value="cross">排列組合（全部組合）</option>
+        <option value="zip">一對一對應</option>
+      </select>
+    </section>
+
+    <!-- ===== 右側：輸出 + 歷史 ===== -->
+    <section class="panel output-panel">
+      <h3>📤 產生結果</h3>
+      <pre id="output">由上方模板擷取變數${example}做多個產出
+可以直接在模板內加入新變數
+組合方式 使用時要注意</pre>
+
+      <h3>🕘 指令產生歷史</h3>
+      <div id="history"></div>
+    </section>
+
+  </main>
+</body>
+
+
+</html>
+<script src="pro-k8s-command-data.js"></script>
+<script src="pro-k8s-command-config.js"></script>
+
