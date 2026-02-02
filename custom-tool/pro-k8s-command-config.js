@@ -8,7 +8,7 @@ function addVar(name = '', value = '') {
     <label>變數名稱</label>
     <input value="${name}">
     <label>變數值</label>
-    <textarea>${value}</textarea>
+    <textarea placeholder="換行,逗號,空格">${value}</textarea>
     <button>❌ 刪除</button>
   `;
 
@@ -214,6 +214,10 @@ function renderTemplateOptions(arr) {
     opt.textContent = item.label;
     opt.value = item.value;
     opt.dataset.risk = item.risk || '';
+    if (item.risk==null) {
+    opt.disabled = true;
+    //給禁用選項
+    }
     opt.dataset.desc = item.desc || '未填寫說明';
     select.appendChild(opt);
   });
@@ -257,8 +261,11 @@ groupSelect.addEventListener('change', e => {
 
 /*************************************************
  * 搜尋功能
+ * 想加入新功能 可以搜索全部template以及 點擊後等同於點擊applytemple
  *************************************************/
 let rendersearch = ALL_TEMPLATE['KUBECTL_TEMPLATE_CONFIG'];
+//let rendersearch = ALL_TEMPLATE;
+
 
 const select = document.getElementById('cmdSelect');
 const search = document.getElementById('search');
@@ -293,6 +300,17 @@ select.addEventListener('change', () => {
 select.addEventListener('dblclick', () => {
   const option = select.selectedOptions[0];
   if (option) textarea.value = option.dataset.command;
+});
+
+searchdis=document.getElementsByClassName('hiden')[0]
+
+searchDisploy.addEventListener('click', () => {
+  if (searchdis.className!='t') {
+    searchdis.className='t'
+  }else{
+    searchdis.className='hiden'
+  }
+  
 });
 
 

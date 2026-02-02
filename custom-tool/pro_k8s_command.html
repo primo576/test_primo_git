@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta charset="UTF-8" />
-  <title>指令生成器（進階版）</title>
+  <title>🐇指令生成器（進階版）</title>
 
   
 
@@ -114,6 +115,10 @@
       border-radius: 4px;
     }
   .hiden{
+
+    display:none
+  }
+    .hiden2{
     visibility: hidden;
     display:none
   }
@@ -123,14 +128,20 @@
 <body>
   <div class="layout">
     <div class="section left">
-      <h2>🔧 指令生成器（內部工具版）</h2>
+      <h2>🐇 指令生成器（內部工具版）🔧</h2>
     </div>
     <div class="section right">
       <select id="templateGroup"></select>
     </div>
   </div>
-
-  <hr />
+    <hr />
+      <button onclick="generate()">🚀 產生指令</button>
+  <button onclick="copy()">📋 複製結果</button>
+  <button onclick="addVar()">➕ 新增變數</button>
+<button id="clearVarsBtn">🗑️ 清空暫存變數</button>
+<button id="clearHistoryBtn">🗑️ 清空歷史紀錄</button>
+<button id="searchDisploy">模板搜索</button>
+<hr>
 
   <div class="layout">
     <div class="section left">
@@ -154,29 +165,19 @@
     </div>
   </div>
 
-  <hr />
-
-  <h3>🔣 變數設定</h3>
-  <button onclick="addVar()">➕ 新增變數</button>
-<button id="clearVarsBtn">🗑️ 清空暫存變數</button>
-<button id="clearHistoryBtn">🗑️ 清空歷史紀錄</button>
-
+ 
   <hr />
   <div id="vars"></div>
-
+<br />
   <label>🔀 組合方式</label>
   <select id="mode">
-    <option value="zip">一對一對應</option>
     <option value="cross">排列組合（全部組合）</option>
+    <option value="zip">一對一對應</option>
   </select>
-
-  <br /><br />
-
-  <button onclick="generate()">🚀 產生指令</button>
-  <button onclick="copy()">📋 複製結果</button>
-
   <h3>📤 產生結果</h3>
-  <pre id="output"></pre>
+  <pre id="output">由上方模板擷取變數${example}做多個產出
+可以直接在模板內加入新變數
+組合方式 使用時要注意</pre>
 
   <h3>🕘 指令產生歷史</h3>
 <div id="history"></div>

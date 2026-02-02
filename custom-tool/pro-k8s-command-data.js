@@ -12,7 +12,7 @@ ALL_TEMPLATE={
   {
     label: '— 自訂 —',
     value: '',
-    risk: null,
+    risk: 'custom',
     desc: ``
   },
 
