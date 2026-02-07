@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <title>IP 過濾工具</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont;
+      padding: 20px;
+    }
+    textarea {
+      width: 100%;
+      height: 160px;
+      margin-bottom: 10px;
+      font-family: monospace;
+    }
+    input {
+      width: 300px;
+    }
+    button {
+      padding: 6px 14px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<h3>原始文字</h3>
+<textarea id="inputText" placeholder="貼上 log / 文字"></textarea>
+
+<h3>第一層過濾（關鍵字）</h3>
+<input id="keyword" placeholder="例如：白名单已满" />
+<label>
+  <input type="checkbox" id="enableIPv6" checked />
+  同時過濾 IPv6
+</label>
+
+<br />
+<button onclick="process()">開始過濾</button>
+
+<h3>結果（IP，已去重）</h3>
+<textarea id="outputText" readonly></textarea>
+
+<script>
+function process() {
+  const text = document.getElementById('inputText').value;
+  const keyword = document.getElementById('keyword').value;
+  const enableIPv6 = document.getElementById('enableIPv6').checked;
+
+  const lines = text.split('\n');
+
+  // IPv4 regex
+  const ipv4Regex =
+    /\b((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\b/g;
+
+  // IPv6 regex（實務可用版，不是 RFC 全集）
+  const ipv6Regex =
+    /\b([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}\b/g;
+
+  const ipSet = new Set();
+
+  lines.forEach(line => {
+    // 第一層：關鍵字過濾
+    if (keyword && !line.includes(keyword)) return;
+
+    // 第二層：抓 IPv4
+    const ipv4s = line.match(ipv4Regex) || [];
+    ipv4s.forEach(ip => ipSet.add(ip));
+
+    // 第二層：抓 IPv6
+    if (enableIPv6) {
+      const ipv6s = line.match(ipv6Regex) || [];
+      ipv6s.forEach(ip => ipSet.add(ip));
+    }
+  });
+
+  document.getElementById('outputText').value =
+    Array.from(ipSet).join('\n');
+}
+</script>
+
+</body>
+</html>

@@ -140,6 +140,17 @@ br get ingress gocron.com -n gocron -o yaml`
     value: 'kubectl get ingress -A',
     risk: 'safe'
   },
+  {
+    label: '測試gocron路由（✅安全）',
+    value: `echo https://br-gocron.yq-ops.top/\${ns}/#/task
+curl https://br-gocron.yq-ops.top/\${ns}/#/task`,
+    risk: 'safe',
+    desc: `改完gocron後訪問新增的未啟動會是503
+啟動的會是任務後台
+例：
+ph get ingress gocron -n gocron -o yaml
+br get ingress gocron.com -n gocron -o yaml`
+  },
 
   // ======================
   // 6. 流程型排障（整套）
@@ -150,6 +161,52 @@ br get ingress gocron.com -n gocron -o yaml`
     risk: null,
     desc: ``
   },
+
+  
+  {
+    "label": "exec 進 Pod（互動 shell）",
+    "value": "kubectl exec -it ${pod} -n ${ns} -- /bin/sh",
+    "risk": "medium",
+    "desc": "進入 Pod 內執行互動式 shell，常用於除錯。實際 shell 依映像檔可能是 sh 或 bash。"
+  },
+  {
+    "label": "exec 進 Pod（bash）",
+    "value": "kubectl exec -it ${pod} -n ${ns} -- /bin/bash",
+    "risk": "medium",
+    "desc": "直接使用 bash 進入 Pod，僅適用於容器內有安裝 bash 的情況。"
+  },
+  {
+    "label": "exec 指定 container",
+    "value": "kubectl exec -it ${pod} -c ${container} -n ${ns} -- /bin/sh",
+    "risk": "medium",
+    "desc": "當 Pod 內有多個 container 時，必須指定 container 才能 exec。"
+  },
+  {
+    "label": "exec 執行單一指令",
+    "value": "kubectl exec ${pod} -n ${ns} -- ls /",
+    "risk": "low",
+    "desc": "不進入互動模式，僅在 Pod 內執行一次指令並回傳結果。"
+  },
+  {
+    "label": "exec 查看環境變數",
+    "value": "kubectl exec ${pod} -n ${ns} -- env",
+    "risk": "low",
+    "desc": "列出 Pod 內所有環境變數，注意可能包含敏感資訊。"
+  },
+  {
+    "label": "exec 進 Pod（stdin 關閉）",
+    "value": "kubectl exec ${pod} -n ${ns} -- /bin/sh -c \"${cmd}\"",
+    "risk": "medium",
+    "desc": "以非互動方式執行較複雜指令，適合自動化或腳本使用。"
+  },
+  {
+    "label": "exec 進 Pod（root 使用者）",
+    "value": "kubectl exec -it ${pod} -n ${ns} -- su -",
+    "risk": "high",
+    "desc": "嘗試切換為 root 使用者，僅在容器允許且安全情境下使用。"
+  },
+
+
   {
     label: '排障標準流程（GPT 建議）',
     value:
@@ -299,6 +356,12 @@ kubectl edit 本質是：
     desc: ``
   },
   {
+    label: '升級腳本用 ns轉array',
+    value: '"${ns}",',
+    risk: 'safe',
+    desc: `產出後貼到網址會一排`
+  },
+  {
     label: 'Ingress backend 區塊（gocron 範例）',
     risk: 'safe',
     value: `      - backend:
@@ -306,7 +369,7 @@ kubectl edit 本質是：
             name: gocron-\${ns}
             port:
               number: 80
-        path: /x\${ns}(/|$)(.*)
+        path: /\${ns}(/|$)(.*)
         pathType: ImplementationSpecific`,
     desc: `br edit ingress gocron.com -n gocron 
 ph edit ingress gocron -n gocron 
@@ -317,7 +380,10 @@ kubectl get ingress gocron.com -n gocron -o yaml > ingress.yaml
 vim ingress.yaml
 kubectl apply -f ingress.yaml
 如果要看log
-kubectl logs -n ingress-nginx deploy/ingress-nginx-controller | tail -n 50`
+kubectl logs -n ingress-nginx deploy/ingress-nginx-controller | tail -n 50
+即時追
+kubectl logs -f deploy/ingress-nginx-controller -n ingress-nginx
+`
   }
 ],
 
@@ -341,8 +407,22 @@ SYSTEMCTL_TEMPLATE_CONFIG :[
     label: '列出所有已安裝服務（✅安全｜全部）',
     value: 'systemctl list-unit-files --type=service',
     risk: 'safe',
-    desc: `查看系統中「有哪些 service 存在」
-包含 enabled / disabled / static / masked`
+     desc: `
+查看系統中「有哪些 service 定義檔存在」（不是是否正在執行）
+
+欄位說明：
+• UNIT FILE：服務定義檔名稱（service 本身）
+• STATE：是否設定為「開機自動啟動」
+  - enabled：開機會自動啟動
+  - disabled：不會開機自動啟動
+  - static：不能單獨啟用，只能被其他服務依賴啟動
+  - masked：被完全封鎖，無法啟動
+• PRESET：發行版官方建議的預設狀態（建議值，非目前狀態）
+
+⚠️ 注意：
+此指令「不代表服務是否正在運行」
+需搭配 systemctl status <service> 查看實際執行狀態
+`
   },
   {
     label: '列出開機會啟動的服務（✅安全｜enabled）',

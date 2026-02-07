@@ -102,6 +102,13 @@ function copy() {
   alert('已複製');
 }
 
+function copytemplate() {
+  navigator.clipboard.writeText(
+    document.getElementById('template').value
+  );
+  alert('已複製模板');
+}
+
 
 /*************************************************
  * Template 套用
