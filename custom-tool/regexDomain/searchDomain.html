@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>域名過濾工具</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f172a;
+      color: #e5e7eb;
+      margin: 0;
+      padding: 16px;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin-bottom: 12px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 180px;
+      background: #020617;
+      color: #e5e7eb;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 10px;
+      resize: vertical;
+      margin-bottom: 10px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    button {
+      padding: 8px 14px;
+      background: #2563eb;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .count {
+      margin-top: 6px;
+      font-size: 13px;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧹 域名過濾工具（從任意文字擷取）</h1>
+
+  <textarea id="input" placeholder="貼上任何內容，例如：&#10;https://a.b.com/path&#10;連線到 api.test.com 失敗&#10;foo.bar.com:8080"></textarea>
+
+  <div class="actions">
+    <button onclick="extractDomains()">過濾域名</button>
+    <label>
+      <input type="checkbox" id="mergeSub" checked />
+      合併子網域為主域名（a.b.com → b.com）
+    </label>
+  </div>
+
+  <textarea id="output" placeholder="結果會顯示在這裡（一行一個域名）"></textarea>
+
+  <div class="count" id="count"></div>
+
+  <script>
+    function extractDomains() {
+      const text = document.getElementById('input').value;
+      const mergeSub = document.getElementById('mergeSub').checked;
+
+      // 抓取 domain 的正則（含 URL / 裸域名 / 含 port）
+      const regex = /\b(?:https?:\/\/)?([a-z0-9.-]+\.[a-z]{2,})(?::\d+)?(?:\/[^\s]*)?/gi;
+
+      const set = new Set();
+      let match;
+
+      while ((match = regex.exec(text)) !== null) {
+        let domain = match[1].toLowerCase();
+
+        if (mergeSub) {
+          const parts = domain.split('.');
+          if (parts.length >= 2) {
+            domain = parts.slice(-2).join('.');
+          }
+        }
+
+        set.add(domain);
+      }
+
+      const result = Array.from(set).sort();
+      document.getElementById('output').value = result.join('\n');
+      document.getElementById('count').innerText = `共找到 ${result.length} 個域名`;
+    }
+  </script>
+</body>
+</html>
